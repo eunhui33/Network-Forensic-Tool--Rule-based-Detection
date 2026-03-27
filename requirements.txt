@@ -1,0 +1,11 @@
+jupyterlab
+jupyter
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+ipython
+tqdm
+requests
+openpyxl
