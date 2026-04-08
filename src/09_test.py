@@ -2,21 +2,21 @@ import pandas as pd
 import numpy as np
 
 # ============================================================================
-# 설정 (Train과 동일하게 고정)
+# Configuration (fixed to match Train settings)
 # ============================================================================
 
-# 카테고리 매핑 (05_category.ipynb와 동일)
+# Category mapping (same as 05_category.ipynb)
 CATEGORY_MAPPING = {
-    # DoS/DDoS 계열
+    # DoS/DDoS family
     'DoS attacks-GoldenEye': 'DoS/DDoS',
     'DoS attacks-SlowHTTPTest': 'DoS/DDoS',
     'DDoS attacks-LOIC-HTTP': 'DoS/DDoS',
     'DDOS attack-LOIC-UDP': 'DoS/DDoS',
     
-    # Brute Force (인증 서비스 대상)
+    # Brute Force (targeting authentication services)
     'FTP-BruteForce': 'Brute Force',
     
-    # Web Attack (웹 서버 대상)
+    # Web Attack (targeting web servers)
     'Brute Force -Web': 'Web Attack',
     'Brute Force -XSS': 'Web Attack',
     'SQL Injection': 'Web Attack',
@@ -24,11 +24,11 @@ CATEGORY_MAPPING = {
     # Botnet
     'Bot': 'Botnet',
     
-    # 정상
+    # Benign
     'Benign': 'Benign'
 }
 
-# 최종 Rule 설정 (Train에서 도출된 값)
+# Final rule configuration (thresholds derived from Train)
 FINAL_RULES = {
     'Brute Force': {
         'mode': 'AND',
@@ -45,13 +45,13 @@ FINAL_RULES = {
             'Flow Duration': ('<=', 20.0000),
             'Pkt Len Mean': ('<=', 0.0000)
         },
-        'note': '실패 케이스 (Recall=0%)'
+        'note': 'Failure case (Recall=0%)'
     },
     'DoS/DDoS': {
         'mode': 'AND',
         'alpha': 0.10,
         'conditions': {
-            'PSH Flag Cnt': ('>=', None),  # Step 4B 결과로 채워야 함
+            'PSH Flag Cnt': ('>=', None),  # To be filled with Step 4B result
             'Init Fwd Win Byts': ('>=', None)
         }
     },
@@ -60,14 +60,14 @@ FINAL_RULES = {
         'k': 2,
         'alpha': 0.01,
         'conditions': {
-            'Subflow Fwd Byts': ('>=', None),  # Step 4A 결과로 채워야 함
+            'Subflow Fwd Byts': ('>=', None),  # To be filled with Step 4A result
             'Fwd Header Len': ('>=', None),
             'Fwd Pkt Len Std': ('>=', None)
         }
     }
 }
 
-# 필요한 Feature 목록
+# Required feature list
 REQUIRED_FEATURES = [
     'Bwd Pkts/s', 'Init Fwd Win Byts', 'Flow Duration', 
     'Pkt Len Mean', 'PSH Flag Cnt', 'Subflow Fwd Byts', 
@@ -76,60 +76,60 @@ REQUIRED_FEATURES = [
 
 
 # ============================================================================
-# 데이터 로드 및 전처리
+# Data Loading and Preprocessing
 # ============================================================================
 print("="*70)
-print("Step 5: Test 데이터 최종 검증")
+print("Step 5: Final Validation on Test Data")
 print("="*70)
 
-# 데이터 로드
-df_test = pd.read_csv(r'C:\Users\3eunh\OneDrive\Desktop\NS\code\data\03_test.csv')
+# Load data
+df_test = pd.read_csv(r'../data/03_test.csv')
 
-print(f"\n[1] 데이터 로드 완료")
-print(f"    총 샘플 수: {len(df_test):,}")
+print(f"\n[1] Data loaded successfully")
+print(f"    Total samples: {len(df_test):,}")
 
-# 원본 Label 확인
-print(f"\n[2] 원본 Label 분포:")
+# Check original label distribution
+print(f"\n[2] Original Label distribution:")
 print(df_test['Label'].value_counts().to_string())
 
-# 카테고리 매핑 적용
+# Apply category mapping
 df_test['Category'] = df_test['Label'].map(CATEGORY_MAPPING)
 
-# 매핑 안 된 값 확인
+# Check for unmapped labels
 unmapped = df_test[df_test['Category'].isna()]['Label'].unique()
 if len(unmapped) > 0:
-    print(f"\n⚠️ 매핑 안 된 Label: {unmapped}")
-    # strip 후 재시도
+    print(f"\n⚠️ Unmapped labels: {unmapped}")
+    # Retry after stripping whitespace
     df_test['Label_clean'] = df_test['Label'].str.strip()
     df_test['Category'] = df_test['Label_clean'].map(CATEGORY_MAPPING)
     unmapped_after = df_test[df_test['Category'].isna()]['Label'].unique()
     if len(unmapped_after) > 0:
-        print(f"   재시도 후에도 매핑 안 됨: {unmapped_after}")
-        print(f"   해당 샘플 제외: {df_test['Category'].isna().sum()}개")
+        print(f"   Still unmapped after retry: {unmapped_after}")
+        print(f"   Excluding these samples: {df_test['Category'].isna().sum()}")
         df_test = df_test[df_test['Category'].notna()]
 else:
-    print(f"\n✓ 모든 Label 매핑 완료")
+    print(f"\n✓ All labels mapped successfully")
 
-# 카테고리 분포 확인
-print(f"\n[3] 카테고리별 분포:")
+# Check category distribution
+print(f"\n[3] Category distribution:")
 print(df_test['Category'].value_counts().to_string())
 
-# 필요 Feature 존재 확인
-print(f"\n[4] 필요 Feature 확인:")
+# Verify required features exist
+print(f"\n[4] Required feature check:")
 missing_features = [f for f in REQUIRED_FEATURES if f not in df_test.columns]
 if missing_features:
-    print(f"    ❌ 누락된 Feature: {missing_features}")
-    raise ValueError(f"필수 Feature 누락: {missing_features}")
+    print(f"    ❌ Missing features: {missing_features}")
+    raise ValueError(f"Required features missing: {missing_features}")
 else:
-    print(f"    ✓ 모든 Feature 존재")
+    print(f"    ✓ All features present")
 
 
 # ============================================================================
-# 평가 함수
+# Evaluation Functions
 # ============================================================================
 
 def clean_feature_value(val, feature):
-    """Feature 값 정제"""
+    """Clean feature value"""
     if pd.isna(val) or np.isinf(val):
         return np.nan
     if feature == "Init Fwd Win Byts" and val < 0:
@@ -138,7 +138,7 @@ def clean_feature_value(val, feature):
 
 
 def evaluate_and_rule(df, category, conditions):
-    """AND rule 평가"""
+    """Evaluate AND rule"""
     attack_df = df[df['Category'] == category]
     benign_df = df[df['Category'] == 'Benign']
     
@@ -167,7 +167,7 @@ def evaluate_and_rule(df, category, conditions):
 
 
 def evaluate_k_of_n_rule(df, category, conditions, k):
-    """k-of-n rule 평가"""
+    """Evaluate k-of-n rule"""
     attack_df = df[df['Category'] == category]
     benign_df = df[df['Category'] == 'Benign']
     
@@ -197,7 +197,7 @@ def evaluate_k_of_n_rule(df, category, conditions, k):
 
 
 def compute_metrics(tp, fp, fn, tn, attack_total, benign_total):
-    """성능 지표 계산"""
+    """Calculate performance metrics"""
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0
     f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
@@ -211,36 +211,36 @@ def compute_metrics(tp, fp, fn, tn, attack_total, benign_total):
 
 
 # ============================================================================
-# 최종 평가 실행
+# Run Final Evaluation
 # ============================================================================
 
 print("\n" + "="*70)
-print("최종 검증 결과 (Test Data)")
+print("Final Validation Results (Test Data)")
 print("="*70)
 
 # ========================================
-# 여기에 Step 4에서 도출된 실제 threshold 값을 입력하세요!
+# Fill in the actual threshold values derived from Step 4 below
 # ========================================
 
-# Brute Force (Step 3 결과)
+# Brute Force (Step 3 result)
 FINAL_RULES['Brute Force']['conditions'] = {
     'Bwd Pkts/s': ('>=', 51754.3860),
     'Init Fwd Win Byts': ('>=', 26883.0000)
 }
 
-# Botnet (Step 3 결과 - 실패 케이스)
+# Botnet (Step 3 result - failure case)
 FINAL_RULES['Botnet']['conditions'] = {
     'Flow Duration': ('<=', 20.0000),
     'Pkt Len Mean': ('<=', 0.0000)
 }
 
-# DoS/DDoS (Step 4B 결과)
+# DoS/DDoS (Step 4B result)
 FINAL_RULES['DoS/DDoS']['conditions'] = {
     'PSH Flag Cnt': ('>=', 1.0),
     'Init Fwd Win Byts': ('>=', 14600.0)
 }
 
-# Web Attack (Step 4A 결과)
+# Web Attack (Step 4A result)
 FINAL_RULES['Web Attack']['conditions'] = {
     'Subflow Fwd Byts': ('>=', 24782.0440),
     'Fwd Header Len': ('>=', 400.0),
@@ -248,7 +248,7 @@ FINAL_RULES['Web Attack']['conditions'] = {
 }
 
 
-# 평가 실행
+# Run evaluation
 results = []
 
 for category in ['Brute Force', 'Botnet', 'DoS/DDoS', 'Web Attack']:
@@ -259,13 +259,13 @@ for category in ['Brute Force', 'Botnet', 'DoS/DDoS', 'Web Attack']:
     print(f"[{category}]")
     print(f"{'='*70}")
     
-    # Rule 출력
+    # Print rule
     print(f"Mode: {rule['mode']}, α ≤ {alpha}")
     print("Conditions:")
     for feat, (op, thresh) in rule['conditions'].items():
         print(f"  {feat} {op} {thresh}")
     
-    # 평가
+    # Evaluate
     if rule['mode'] == 'AND':
         result = evaluate_and_rule(df_test, category, rule['conditions'])
     elif rule['mode'] == 'k-of-n':
@@ -273,11 +273,11 @@ for category in ['Brute Force', 'Botnet', 'DoS/DDoS', 'Web Attack']:
         print(f"  (k={k}, {k}-of-{len(rule['conditions'])})")
         result = evaluate_k_of_n_rule(df_test, category, rule['conditions'], k)
     
-    # FPR 제한 만족 여부
+    # Check FPR constraint
     pass_fpr = result['FPR'] <= alpha
     
-    # 결과 출력
-    print(f"\n성능:")
+    # Print results
+    print(f"\nPerformance:")
     print(f"  TP={result['TP']:,} / {result['Attack_Total']:,}")
     print(f"  FP={result['FP']:,} / {result['Benign_Total']:,}")
     print(f"  FN={result['FN']:,}, TN={result['TN']:,}")
@@ -286,7 +286,7 @@ for category in ['Brute Force', 'Botnet', 'DoS/DDoS', 'Web Attack']:
     print(f"  Precision = {result['Precision']:.4f}")
     print(f"  F1        = {result['F1']:.4f}")
     
-    # 결과 저장
+    # Save result
     result['Category'] = category
     result['Alpha'] = alpha
     result['Pass_FPR'] = pass_fpr
@@ -294,11 +294,11 @@ for category in ['Brute Force', 'Botnet', 'DoS/DDoS', 'Web Attack']:
 
 
 # ============================================================================
-# 최종 요약 테이블
+# Final Summary Table
 # ============================================================================
 
 print("\n\n" + "="*70)
-print("최종 요약 테이블 (Test Data)")
+print("Final Summary Table (Test Data)")
 print("="*70)
 
 results_df = pd.DataFrame(results)
@@ -310,12 +310,12 @@ for _, row in results_df.iterrows():
     print(f"{row['Category']:<15} {row['Recall']:>10.4f} {row['FPR']:>10.4f} {row['Alpha']:>8.2f} {pass_str:>8} {row['Precision']:>10.4f} {row['F1']:>10.4f}")
 
 
-# Train vs Test 비교 (Step 4 결과와 비교용)
+# Train vs Test Comparison
 print("\n" + "="*70)
-print("Train vs Test 비교")
+print("Train vs Test Comparison")
 print("="*70)
 
-# Train 결과 (Step 4 최종)
+# Train results (Step 4 final)
 TRAIN_RESULTS = {
     'Brute Force': {'Recall': 0.9660, 'FPR': 0.0088, 'F1': 0.9619},
     'Botnet': {'Recall': 0.0000, 'FPR': 0.0440, 'F1': 0.0000},
